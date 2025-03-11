@@ -56,6 +56,7 @@ public class WebUtils {
     
     /**
      * get target value from parameterMap, if not found will throw {@link IllegalArgumentException}.
+     * 从 parameterMap 获取目标值，如果未找到将抛出非法参数异常
      *
      * @param req {@link HttpServletRequest}
      * @param key key
@@ -72,6 +73,7 @@ public class WebUtils {
     
     /**
      * get target value from parameterMap, if not found will return default value.
+     * 从 parameterMap 获取目标值，如果未找到，将返回默认值。
      *
      * @param req          {@link HttpServletRequest}
      * @param key          key

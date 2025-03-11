@@ -44,9 +44,11 @@ public class NamingHttpClientManager implements Closeable {
     private static final boolean ENABLE_HTTPS = Boolean.getBoolean(TlsSystemConfig.TLS_ENABLE);
     
     private static final int MAX_REDIRECTS = 5;
-    
+
+    // 饿汉式单例
     private static final HttpClientFactory HTTP_CLIENT_FACTORY = new NamingHttpClientFactory();
-    
+
+    // 饿汉单例模式
     private static class NamingHttpClientManagerInstance {
         
         private static final NamingHttpClientManager INSTANCE = new NamingHttpClientManager();

@@ -125,6 +125,8 @@ public class NamingProxy implements Closeable {
         
         if (StringUtils.isNotEmpty(serverList)) {
             this.serverList = Arrays.asList(serverList.split(","));
+            // 当 this.serverList.size() == 1 时，通常表示单机部署。
+            // 当 this.serverList.size() > 1 时，通常表示集群部署。
             if (this.serverList.size() == 1) {
                 this.nacosDomain = serverList;
             }
@@ -224,6 +226,7 @@ public class NamingProxy implements Closeable {
     
     /**
      * register a instance to service with specified instance properties.
+     * 使用指定的实例属性将实例注册到 Service。
      *
      * @param serviceName name of service
      * @param groupName   group of service
@@ -234,7 +237,7 @@ public class NamingProxy implements Closeable {
         
         NAMING_LOGGER.info("[REGISTER-SERVICE] {} registering service {} with instance: {}", namespaceId, serviceName,
                 instance);
-        
+        // 1.参数组装
         final Map<String, String> params = new HashMap<String, String>(16);
         params.put(CommonParams.NAMESPACE_ID, namespaceId);
         params.put(CommonParams.SERVICE_NAME, serviceName);
@@ -247,7 +250,7 @@ public class NamingProxy implements Closeable {
         params.put("healthy", String.valueOf(instance.isHealthy()));
         params.put("ephemeral", String.valueOf(instance.isEphemeral()));
         params.put("metadata", JacksonUtils.toJson(instance.getMetadata()));
-        
+        // 2.Api调用
         reqApi(UtilAndComs.nacosUrlInstance, params, HttpMethod.POST);
         
     }
@@ -415,10 +418,17 @@ public class NamingProxy implements Closeable {
     /**
      * Send beat.
      *
-     * @param beatInfo         beat info
-     * @param lightBeatEnabled light beat
+     * @param beatInfo         beat info   包含服务实例的心跳信息
+     * @param lightBeatEnabled light beat  标识是否启用轻量级心跳
      * @return beat result
      * @throws NacosException nacos exception
+     *
+     * 特性	    普通心跳	                           轻量级心跳
+     * 数据量	较大，包含服务实例的详细信息	           较小，仅包含必要信息
+     * 网络开销	高	                               低
+     * 处理时间	相对较长	                           快速
+     * 更新频率	可以很高，取决于服务实例状态的变化	   通常较低
+     * 使用场景	需要频繁更新服务实例状态的情况	       服务实例状态稳定，变化不大的情况
      */
     public JsonNode sendBeat(BeatInfo beatInfo, boolean lightBeatEnabled) throws NacosException {
         
@@ -427,6 +437,7 @@ public class NamingProxy implements Closeable {
         }
         Map<String, String> params = new HashMap<String, String>(8);
         Map<String, String> bodyMap = new HashMap<String, String>(2);
+        // 普通心跳需要带请求体，轻量级心跳不需要
         if (!lightBeatEnabled) {
             bodyMap.put("beat", JacksonUtils.toJson(beatInfo));
         }
@@ -518,14 +529,15 @@ public class NamingProxy implements Closeable {
             String method) throws NacosException {
         
         params.put(CommonParams.NAMESPACE_ID, getNamespaceId());
-        
+        // 1.注册中心列表为空或者注册中心地址为空则抛出异常（多个注册中心会用列表，单个就会赋值给nacosDomain）
         if (CollectionUtils.isEmpty(servers) && StringUtils.isBlank(nacosDomain)) {
             throw new NacosException(NacosException.INVALID_PARAM, "no server available");
         }
         
         NacosException exception = new NacosException();
-        
+        // 2.单个注册中心的情况下，就直接调用API，中途异常 重试maxRetry（默认3次，前提是nacos异常）
         if (StringUtils.isNotBlank(nacosDomain)) {
+            // nacos为单机部署时
             for (int i = 0; i < maxRetry; i++) {
                 try {
                     return callServer(api, params, body, nacosDomain, method);
@@ -537,10 +549,13 @@ public class NamingProxy implements Closeable {
                 }
             }
         } else {
+            // 3.多个注册中心情况下，随机选择一个注册中心调用API，中途异常，则轮询其他注册中心地址调用API
+            // 集群情况下
             Random random = new Random(System.currentTimeMillis());
             int index = random.nextInt(servers.size());
             
             for (int i = 0; i < servers.size(); i++) {
+                // 从集群中随机取一个服务器
                 String server = servers.get(index);
                 try {
                     return callServer(api, params, body, server, method);
@@ -550,6 +565,9 @@ public class NamingProxy implements Closeable {
                         NAMING_LOGGER.debug("request {} failed.", server, e);
                     }
                 }
+                // 在首次尝试失败之后，程序会使用以下代码来决定下一个尝试的服务,轮询
+                // 避免了所有客户端同时选择同一个服务器作为起始点，从而分散负载。
+                // 在某个特定服务器不可用时，能有效地转向其他可用的服务器，增强了系统的容错性和可靠性。
                 index = (index + 1) % servers.size();
             }
         }
@@ -604,6 +622,7 @@ public class NamingProxy implements Closeable {
         }
         
         try {
+            // 1.调用API -->  http://IP:PORT/nacos/v1/ns/instance
             HttpRestResult<String> restResult = nacosRestTemplate
                     .exchangeForm(url, header, Query.newInstance().initParams(params), body, method, String.class);
             end = System.currentTimeMillis();

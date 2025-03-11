@@ -60,7 +60,8 @@ public class Instance extends com.alibaba.nacos.api.naming.pojo.Instance impleme
     private String tenant;
     
     private String app;
-    
+
+    // 仅数字和点
     private static final Pattern ONLY_DIGIT_AND_DOT = Pattern.compile("(\\d|\\.)+");
     
     private static final String SPLITER = "_";
@@ -353,6 +354,7 @@ public class Instance extends com.alibaba.nacos.api.naming.pojo.Instance impleme
     
     /**
      * Judge whether this instance is validate.
+     * 判断该实例是否为 validate。
      *
      * @throws NacosException if instance is not validate
      */
@@ -370,7 +372,12 @@ public class Instance extends com.alibaba.nacos.api.naming.pojo.Instance impleme
         }
         
     }
-    
+
+    /**
+     * 仅数字和点，用于判断版本号和ip是否合法
+     *
+     * @return 是否仅数字和点
+     */
     private boolean onlyContainsDigitAndDot() {
         Matcher matcher = ONLY_DIGIT_AND_DOT.matcher(getIp());
         return matcher.matches();

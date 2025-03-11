@@ -114,10 +114,14 @@ public class NamingUtils {
     
     /**
      * <p>Check instance param about keep alive.</p>
+     * 检查实例参数是否保持活动。
      *
      * <pre>
      * heart beat timeout must > heart beat interval
      * ip delete timeout must  > heart beat interval
+     * 心跳超时必须 > 心跳间隔
+     * ip delete 超时必须 >心跳间隔
+     *
      * </pre>
      *
      * @param instance need checked instance

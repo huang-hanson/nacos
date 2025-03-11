@@ -133,14 +133,16 @@ public class InstanceController {
     @PostMapping
     @Secured(parser = NamingResourceParser.class, action = ActionTypes.WRITE)
     public String register(HttpServletRequest request) throws Exception {
-        
+        // 1.获取namespace 为空 则默认 public
         final String namespaceId = WebUtils
                 .optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
+        // 2.获取服务名 为空抛出异常（"Param '" + key + "' is required."）
         final String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
+        // 3.根据"@@"分割服务名，不符合规则则抛出异常
         NamingUtils.checkServiceNameFormat(serviceName);
-        
+        // 4.获取实例信息，并校验
         final Instance instance = parseInstance(request);
-        
+        // 5.服务注册
         serviceManager.registerInstance(namespaceId, serviceName, instance);
         return "ok";
     }
@@ -585,8 +587,10 @@ public class InstanceController {
         Instance instance = getIpAddress(request);
         instance.setApp(app);
         instance.setServiceName(serviceName);
-        // Generate simple instance id first. This value would be updated according to
+        // Generate simple instance id first. This value would be updated according to getIp() + "#" + getPort() + "#" + getClusterName() + "#" + getServiceName()
+        // 首先生成简单实例 ID。此值将根据getIp() + "#" + getPort() + "#" + getClusterName() + "#" + getServiceName()
         // INSTANCE_ID_GENERATOR.
+        // 实例 ID 生成器
         instance.setInstanceId(instance.generateInstanceId());
         instance.setLastBeat(System.currentTimeMillis());
         String metadata = WebUtils.optional(request, "metadata", StringUtils.EMPTY);

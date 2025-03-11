@@ -20,6 +20,7 @@ import com.alibaba.nacos.naming.consistency.persistent.raft.RaftCore;
 import com.alibaba.nacos.naming.consistency.persistent.raft.RaftPeer;
 import com.alibaba.nacos.naming.consistency.persistent.raft.RaftPeerSet;
 import com.alibaba.nacos.naming.core.DistroMapper;
+import com.alibaba.nacos.naming.core.Service;
 import com.alibaba.nacos.naming.core.ServiceManager;
 import com.alibaba.nacos.naming.healthcheck.HealthCheckProcessorDelegate;
 import com.alibaba.nacos.naming.misc.NetUtils;
@@ -29,6 +30,7 @@ import com.alibaba.nacos.sys.env.EnvUtil;
 import com.alibaba.nacos.sys.utils.ApplicationUtils;
 import org.junit.Before;
 import org.junit.Rule;
+import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
@@ -38,55 +40,60 @@ import org.mockito.junit.MockitoJUnitRunner;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.mock.env.MockEnvironment;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
+
 import static org.mockito.Mockito.doReturn;
 
 @RunWith(MockitoJUnitRunner.class)
 public class BaseTest {
-    
+
     protected static final String TEST_CLUSTER_NAME = "test-cluster";
-    
+
     protected static final String TEST_SERVICE_NAME = "DEFAULT_GROUP@@test-service";
-    
+
     protected static final String TEST_GROUP_NAME = "test-group-name";
-    
+
     protected static final String TEST_NAMESPACE = "test-namespace";
-    
+
     @Mock
     public ServiceManager serviceManager;
-    
+
     @Mock
     public RaftPeerSet peerSet;
-    
+
     @Mock
     public RaftCore raftCore;
-    
+
     @Rule
     public ExpectedException expectedException = ExpectedException.none();
-    
+
     @Spy
     protected ConfigurableApplicationContext context;
-    
+
     @Mock
     protected DistroMapper distroMapper;
-    
+
     @Spy
     protected SwitchDomain switchDomain;
-    
+
     @Mock
     protected HealthCheckProcessorDelegate delegate;
-    
+
     @Mock
     protected PushService pushService;
-    
+
     @Spy
     private MockEnvironment environment;
-    
+
     @Before
     public void before() {
         EnvUtil.setEnvironment(environment);
         ApplicationUtils.injectContext(context);
     }
-    
+
     protected void mockRaft() {
         RaftPeer peer = new RaftPeer();
         peer.ip = NetUtils.localServer();
@@ -95,20 +102,42 @@ public class BaseTest {
         Mockito.when(peerSet.getLeader()).thenReturn(peer);
         Mockito.when(peerSet.isLeader(NetUtils.localServer())).thenReturn(true);
     }
-    
+
     protected void mockInjectPushServer() {
         doReturn(pushService).when(context).getBean(PushService.class);
     }
-    
+
     protected void mockInjectHealthCheckProcessor() {
         doReturn(delegate).when(context).getBean(HealthCheckProcessorDelegate.class);
     }
-    
+
     protected void mockInjectSwitchDomain() {
         doReturn(switchDomain).when(context).getBean(SwitchDomain.class);
     }
-    
+
     protected void mockInjectDistroMapper() {
         doReturn(distroMapper).when(context).getBean(DistroMapper.class);
+    }
+
+    @Test
+    public void test_regex() {
+        Pattern ONLY_DIGIT_AND_DOT = Pattern.compile("(\\d|\\.)+");
+        assert ONLY_DIGIT_AND_DOT.matcher("1.1.1.1").matches();
+        assert ONLY_DIGIT_AND_DOT.matcher("1234").matches();
+        assert ONLY_DIGIT_AND_DOT.matcher(".").matches();
+        assert !ONLY_DIGIT_AND_DOT.matcher("123abc.a").matches();
+        assert !ONLY_DIGIT_AND_DOT.matcher("127.0.0.1:8848").matches();
+    }
+
+    @Test
+    public void test_map_putIfAbsent() {
+        Map<String, Map<String, String>> map = new ConcurrentHashMap<>();
+        Map<String, String> mapValue = new HashMap<>();
+        mapValue.put("valueKey", "valueValue");
+        map.put("key1", mapValue);
+        System.out.println(map);
+        map.get("key1").putIfAbsent("valueKey2", "valueValue2");
+        System.out.println(map);
+        System.out.println(map.get("key1").putIfAbsent("valueKey2", "valueValue2"));
     }
 }

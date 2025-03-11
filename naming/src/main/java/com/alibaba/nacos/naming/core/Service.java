@@ -535,6 +535,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
     
     /**
      * Re-calculate checksum of service.
+     * 重新计算服务的校验和
      */
     public synchronized void recalculateChecksum() {
         List<Instance> ips = allIPs();

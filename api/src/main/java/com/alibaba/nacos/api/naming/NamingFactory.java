@@ -55,8 +55,11 @@ public class NamingFactory {
      */
     public static NamingService createNamingService(Properties properties) throws NacosException {
         try {
+            // 1.反射获取NacosNamingService的构造函数
             Class<?> driverImplClass = Class.forName("com.alibaba.nacos.client.naming.NacosNamingService");
+            // 2.获取Properties构造方法
             Constructor constructor = driverImplClass.getConstructor(Properties.class);
+            // 3.实例化NacosNamingService（NacosNamingService实现了NamingService）
             NamingService vendorImpl = (NamingService) constructor.newInstance(properties);
             return vendorImpl;
         } catch (Throwable e) {

@@ -47,10 +47,17 @@ public class HealthCheckReactor {
     
     /**
      * Schedule client beat check task with a delay.
+     * 将客户端心跳检查任务安排为延迟。
+     *
+     * 假设你有一个服务需要定期检查客户端的心跳状态，可以使用 ClientBeatCheckTask 来封装具体的检查逻辑，并通过上述方法将其调度为周期性任务。
+     * 这样可以确保每个检查任务只被调度一次，并且能够按照设定的时间间隔自动执行。
      *
      * @param task client beat check task
      */
     public static void scheduleCheck(ClientBeatCheckTask task) {
+        // 该方法的作用是根据任务的唯一键（taskKey）来决定是否调度一个新的周期性任务。
+        // 如果任务尚未调度，则通过 GlobalExecutor.scheduleNamingHealth 方法进行调度，并将生成的 ScheduledFuture 对象存入 futureMap 中。
+        // 这种设计避免了重复调度相同任务的问题，同时利用 ConcurrentHashMap 确保了线程安全。
         futureMap.computeIfAbsent(task.taskKey(),
                 k -> GlobalExecutor.scheduleNamingHealth(task, 5000, 5000, TimeUnit.MILLISECONDS));
     }

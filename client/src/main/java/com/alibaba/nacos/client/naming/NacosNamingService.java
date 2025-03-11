@@ -209,12 +209,17 @@ public class NacosNamingService implements NamingService {
     
     @Override
     public void registerInstance(String serviceName, String groupName, Instance instance) throws NacosException {
+        // 1.心跳参数校验  心跳超时时长（默认15s）、服务删除超时时长（默认35s）> 心跳间隔时长（默认5s）
         NamingUtils.checkInstanceIsLegal(instance);
+        // 2.服务名拼接（格式：groupName+"@@"+serviceName）
         String groupedServiceName = NamingUtils.getGroupedName(serviceName, groupName);
+        // 3.是否零时实例判断  默认是true
         if (instance.isEphemeral()) {
+            // 4.开启心跳机制
             BeatInfo beatInfo = beatReactor.buildBeatInfo(groupedServiceName, instance);
             beatReactor.addBeatInfo(groupedServiceName, beatInfo);
         }
+        // 5.服务注册
         serverProxy.registerService(groupedServiceName, groupName, instance);
     }
     

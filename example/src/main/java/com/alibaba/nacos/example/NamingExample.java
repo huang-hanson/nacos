@@ -40,13 +40,13 @@ import java.util.concurrent.TimeUnit;
 public class NamingExample {
     
     public static void main(String[] args) throws NacosException {
-        
+        // 1.注册中心相关配置
         Properties properties = new Properties();
         properties.setProperty("serverAddr", System.getProperty("serverAddr"));
         properties.setProperty("namespace", System.getProperty("namespace"));
-        
+        // 2.反射初始化NacosNamingService
         NamingService naming = NamingFactory.createNamingService(properties);
-        
+        // 3.服务注册
         naming.registerInstance("nacos.test.3", "11.11.11.11", 8888, "TEST1");
         
         naming.registerInstance("nacos.test.3", "2.2.2.2", 9999, "DEFAULT");

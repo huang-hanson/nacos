@@ -40,7 +40,8 @@ public class BeatInfo {
     private volatile boolean scheduled;
     
     private volatile long period;
-    
+
+    // 不是包装类，所以不存在null，boolean的默认值是false
     private volatile boolean stopped;
     
     @Override

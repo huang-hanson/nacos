@@ -55,6 +55,7 @@ public class Instance implements Serializable {
     
     /**
      * instance weight.
+     * 实例权重。
      */
     private double weight = 1.0D;
     
@@ -65,11 +66,13 @@ public class Instance implements Serializable {
     
     /**
      * If instance is enabled to accept request.
+     * 如果启用了 instance 以接受请求。
      */
     private boolean enabled = true;
     
     /**
      * If instance is ephemeral.
+     * 如果 instance 是短暂的。
      *
      * @since 1.0.0
      */
@@ -77,6 +80,7 @@ public class Instance implements Serializable {
     
     /**
      * cluster information of instance.
+     * 实例的集群信息。
      */
     private String clusterName;
     

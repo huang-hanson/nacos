@@ -83,6 +83,8 @@ import static com.alibaba.nacos.naming.misc.UtilsAndCommons.UPDATE_INSTANCE_META
 public class ServiceManager implements RecordListener<Service> {
     
     /**
+     * 超级无敌重要的知识点，服务的注册表
+     *
      * Map(namespace, Map(group::serviceName, Service)).
      */
     private final Map<String, Map<String, Service>> serviceMap = new ConcurrentHashMap<>();
@@ -457,6 +459,7 @@ public class ServiceManager implements RecordListener<Service> {
     
     /**
      * Create service if not exist.
+     * 如果不存在，则创建 service。
      *
      * @param namespaceId namespace
      * @param serviceName service name
@@ -466,13 +469,16 @@ public class ServiceManager implements RecordListener<Service> {
      */
     public void createServiceIfAbsent(String namespaceId, String serviceName, boolean local, Cluster cluster)
             throws NacosException {
+        // 1.尝试从注册表中获取服务 第一次一般都是空
         Service service = getService(namespaceId, serviceName);
         if (service == null) {
             
             Loggers.SRV_LOG.info("creating empty service {}:{}", namespaceId, serviceName);
+            // 2.实例化新服务
             service = new Service();
             service.setName(serviceName);
             service.setNamespaceId(namespaceId);
+            // 根据@@来划分，取第一个数为groupName
             service.setGroupName(NamingUtils.getGroupName(serviceName));
             // now validate the service. if failed, exception will be thrown
             service.setLastModifiedMillis(System.currentTimeMillis());
@@ -482,9 +488,10 @@ public class ServiceManager implements RecordListener<Service> {
                 service.getClusterMap().put(cluster.getName(), cluster);
             }
             service.validate();
-            
+            // 3.将服务放入新的注册表 以及 加入监听列表，并开启心跳检测
             putServiceAndInit(service);
             if (!local) {
+                // 不是零时实例的话，将服务放入 raft 集群中
                 addOrReplaceService(service);
             }
         }
@@ -492,8 +499,10 @@ public class ServiceManager implements RecordListener<Service> {
     
     /**
      * Register an instance to a service in AP mode.
+     * 在 AP 模式下将实例注册到服务。
      *
      * <p>This method creates service or cluster silently if they don't exist.
+     * 如果服务或集群不存在，此方法会以静默方式创建它们。
      *
      * @param namespaceId id of namespace
      * @param serviceName service name
@@ -501,16 +510,17 @@ public class ServiceManager implements RecordListener<Service> {
      * @throws Exception any error occurred in the process
      */
     public void registerInstance(String namespaceId, String serviceName, Instance instance) throws NacosException {
-        
+        // 创建一个空的service（如果时第一次来注册实例，要先创建一个空service出来，放入注册表）
+        // 此时不包含实例信息
         createEmptyService(namespaceId, serviceName, instance.isEphemeral());
-        
+        // 拿到建好的service
         Service service = getService(namespaceId, serviceName);
         
         if (service == null) {
             throw new NacosException(NacosException.INVALID_PARAM,
                     "service not found, namespace: " + namespaceId + ", service: " + serviceName);
         }
-        
+        // 添加要注册的实例要service中
         addInstance(namespaceId, serviceName, instance.isEphemeral(), instance);
     }
     
@@ -645,17 +655,18 @@ public class ServiceManager implements RecordListener<Service> {
      */
     public void addInstance(String namespaceId, String serviceName, boolean ephemeral, Instance... ips)
             throws NacosException {
-        
+        // 监听服务列表用到的key，服务唯一标识
         String key = KeyBuilder.buildInstanceListKey(namespaceId, serviceName, ephemeral);
         
         Service service = getService(namespaceId, serviceName);
-        
+        // 同步锁，避免并发修改的安全问题
         synchronized (service) {
+            // 1)获取要更新的实例列表
             List<Instance> instanceList = addIpAddresses(service, ephemeral, ips);
-            
+            // 2)封装实例列表到Instances对象
             Instances instances = new Instances();
             instances.setInstanceList(instanceList);
-            
+            // 3)完成 注册表更新  以及 Nacos集群的数据同步
             consistencyService.put(key, instances);
         }
     }
@@ -868,17 +879,35 @@ public class ServiceManager implements RecordListener<Service> {
     
     /**
      * Put service into manager.
+     * 将 service 放入 manager。
+     *
+     * 为什么要用double check locking？
+     * 考虑以下场景：
+     * 初始状态：假设 serviceMap 中还没有任何命名空间 ID。
+     * 线程A：首先到达第一个检查点 if (!serviceMap.containsKey(service.getNamespaceId()))，发现 serviceMap 中确实没有该命名空间 ID，于是准备进入同步块。
+     * 线程B：几乎同时到达第一个检查点，也发现 serviceMap 中没有该命名空间 ID，并试图进入同步块。
+     * 线程A：成功获取了锁并进入了同步块，再次检查 if (!serviceMap.containsKey(service.getNamespaceId()))，确认 serviceMap 中仍然没有该命名空间 ID，然后执行 serviceMap.put(service.getNamespaceId(), new ConcurrentSkipListMap<>());。
+     * 线程B：此时线程B正在等待线程A释放锁。一旦线程A完成操作并释放锁，线程B获得锁并进入同步块。
+     * 线程B：如果不存在第二次检查，线程B将直接执行 serviceMap.put(service.getNamespaceId(), new ConcurrentSkipListMap<>());，这会导致重复添加相同的命名空间 ID 到 serviceMap 中，造成数据不一致的问题。
      *
      * @param service service
      */
     public void putService(Service service) {
+        // 第一次检查是在同步块外部，如果 serviceMap 已经包含了指定的命名空间 ID，则不需要进入同步块，从而减少了获取锁的开销。
         if (!serviceMap.containsKey(service.getNamespaceId())) {
+            // synchronized (putServiceLock) 确保在同一时刻只有一个线程可以执行该同步块内的代码。
+            // 这里的 putServiceLock 是一个对象，通常是一个私有的、静态的最终字段
+            // （private static final Object putServiceLock = new Object();），用来作为同步锁的对象。
             synchronized (putServiceLock) {
+                // 双重检查锁定（Double-Checked Locking）模式
+                // 这是为了防止多个线程同时通过了第一次检查后导致的竞争条件，即只有第一个进入同步块的线程会真正执行 put 操作。
                 if (!serviceMap.containsKey(service.getNamespaceId())) {
                     serviceMap.put(service.getNamespaceId(), new ConcurrentSkipListMap<>());
                 }
             }
         }
+        //  这行代码的作用是在 serviceMap 中根据命名空间 ID 获取对应的 Map，
+        //  然后尝试将服务名（service.getName()）和服务实例（service）作为键值对插入到该 Map 中，但仅当该键（服务名）不存在时才进行插入。
         serviceMap.get(service.getNamespaceId()).putIfAbsent(service.getName(), service);
     }
     
