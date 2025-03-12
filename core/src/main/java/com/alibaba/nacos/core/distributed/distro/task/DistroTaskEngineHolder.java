@@ -25,14 +25,17 @@ import org.springframework.stereotype.Component;
 
 /**
  * Distro task engine holder.
+ * Distro 任务引擎支架
  *
  * @author xiweng.yy
  */
 @Component
 public class DistroTaskEngineHolder {
-    
+
+    // 延迟任务执行引擎
     private final DistroDelayTaskExecuteEngine delayTaskExecuteEngine = new DistroDelayTaskExecuteEngine();
-    
+
+    // 执行 Workers Manager
     private final DistroExecuteTaskExecuteEngine executeWorkersManager = new DistroExecuteTaskExecuteEngine();
     
     public DistroTaskEngineHolder(DistroComponentHolder distroComponentHolder) {

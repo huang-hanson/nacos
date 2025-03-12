@@ -43,6 +43,7 @@ import org.springframework.mock.env.MockEnvironment;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 import static org.mockito.Mockito.doReturn;
@@ -139,5 +140,62 @@ public class BaseTest {
         map.get("key1").putIfAbsent("valueKey2", "valueValue2");
         System.out.println(map);
         System.out.println(map.get("key1").putIfAbsent("valueKey2", "valueValue2"));
+    }
+
+    private static AtomicInteger atomicInteger = new AtomicInteger(0);
+
+    @Test
+    public void test_incrementAndGet() {
+        // 线程1
+        Thread t1 = new Thread(() -> {
+            int value = atomicInteger.incrementAndGet();
+            System.out.println("Thread 1: " + value);
+        });
+
+        // 线程2
+        Thread t2 = new Thread(() -> {
+            int value = atomicInteger.incrementAndGet();
+            System.out.println("Thread 2: " + value);
+        });
+
+        t1.start();
+        t2.start();
+
+        try {
+            t1.join();
+            t2.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Final value: " + atomicInteger.get());
+    }
+
+
+    @Test
+    public void test_getAndIncrement() {
+        // 线程1
+        Thread t1 = new Thread(() -> {
+            int value = atomicInteger.getAndIncrement();
+            System.out.println("Thread 1: " + value);
+        });
+
+        // 线程2
+        Thread t2 = new Thread(() -> {
+            int value = atomicInteger.getAndIncrement();
+            System.out.println("Thread 2: " + value);
+        });
+
+        t1.start();
+        t2.start();
+
+        try {
+            t1.join();
+            t2.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        System.out.println("Final value: " + atomicInteger.get());
     }
 }

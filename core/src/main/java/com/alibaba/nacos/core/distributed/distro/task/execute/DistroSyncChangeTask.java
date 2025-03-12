@@ -36,7 +36,9 @@ public class DistroSyncChangeTask extends AbstractDistroExecuteTask {
         super(distroKey);
         this.distroComponentHolder = distroComponentHolder;
     }
-    
+
+    //1.syncData方法最终会到NamingProxy.syncData方法，执行HTTP请求，同步数据
+    //2.如果失败了，则又会调用NacosDelayTaskExecuteEngine.addTask（）方法重新将DistroDelayTask任务放进ConcurrentHashMap中，重复上述的processTasks方法
     @Override
     public void run() {
         Loggers.DISTRO.info("[DISTRO-START] {}", toString());
@@ -46,11 +48,13 @@ public class DistroSyncChangeTask extends AbstractDistroExecuteTask {
             distroData.setType(DataOperation.CHANGE);
             boolean result = distroComponentHolder.findTransportAgent(type).syncData(distroData, getDistroKey().getTargetServer());
             if (!result) {
+                // 失败处理
                 handleFailedTask();
             }
             Loggers.DISTRO.info("[DISTRO-END] {} result: {}", toString(), result);
         } catch (Exception e) {
             Loggers.DISTRO.warn("[DISTRO] Sync data change failed.", e);
+            // 失败处理
             handleFailedTask();
         }
     }

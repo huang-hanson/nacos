@@ -84,6 +84,8 @@ public class Cluster extends com.alibaba.nacos.api.naming.pojo.Cluster implement
      *
      * <p>the cluster name cannot be null, and only the arabic numerals, letters and endashes are allowed.
      *
+     * 群集名称不能为 null，并且只允许使用阿拉伯数字、字母和短划线。
+     *
      * @param clusterName the cluster name
      * @param service     the service to which the current cluster belongs
      * @throws IllegalArgumentException the service is null, or the cluster name is null, or the cluster name is

@@ -36,6 +36,7 @@ public enum DataOperation {
     DELETE,
     /**
      * Data verify.
+     * 数据验证
      */
     VERIFY;
 }

@@ -49,6 +49,7 @@ public class DistroDelayTaskProcessor implements NacosTaskProcessor {
         DistroDelayTask distroDelayTask = (DistroDelayTask) task;
         DistroKey distroKey = distroDelayTask.getDistroKey();
         if (DataOperation.CHANGE.equals(distroDelayTask.getAction())) {
+            // 又被塞到一个不知名封装好的地方（是一个阻塞队列，同样有地方取出来执行，我们直接看这个任务的执行）
             DistroSyncChangeTask syncChangeTask = new DistroSyncChangeTask(distroKey, distroComponentHolder);
             distroTaskEngineHolder.getExecuteWorkersManager().addTask(distroKey, syncChangeTask);
             return true;

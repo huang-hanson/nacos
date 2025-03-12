@@ -60,8 +60,15 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * one block of data. Each block of data is generated, removed and synchronized by its responsible server. So every
  * Nacos server only handles writings for a subset of the total service data.
  *
+ * 使用 distro 算法将数据划分为多个块。
+ * 每个 Nacos 服务器节点只负责一个数据块。
+ * 每个数据块都由其负责的服务器生成、删除和同步。
+ * 所以每个 Nacos 服务器只处理总服务数据子集的写入。
+ *
  * <p>At mean time every Nacos server receives data sync of other Nacos server, so every Nacos server will eventually
  * have a complete set of data.
+ *
+ * 同时每个 Nacos 服务器都会收到其他 Nacos 服务器的数据同步，所以每个 Nacos 服务器最终都会有一套完整的数据。
  *
  * @author nkorange
  * @since 1.0.0
@@ -105,7 +112,9 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
     
     @Override
     public void put(String key, Record value) throws NacosException {
+        // 1.临时实例 本地注册表更新
         onPut(key, value);
+        // 2.临时实例 将注册表同步给集群
         distroProtocol.sync(new DistroKey(key, KeyBuilder.INSTANCE_LIST_KEY_PREFIX), DataOperation.CHANGE,
                 globalConfig.getTaskDispatchPeriod() / 2);
     }
@@ -365,27 +374,34 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
     public boolean isInitialized() {
         return distroProtocol.isInitialized() || !globalConfig.isDataWarmup();
     }
-    
+
+    // 会将任务放入Notifier内部的阻塞队列中，Notifier是个Runnable（异步执行任务）
     public class Notifier implements Runnable {
         
         private ConcurrentHashMap<String, String> services = new ConcurrentHashMap<>(10 * 1024);
-        
+
         private BlockingQueue<Pair<String, DataOperation>> tasks = new ArrayBlockingQueue<>(1024 * 1024);
         
         /**
          * Add new notify task to queue.
          *
+         * 将新的通知任务添加到队列中。
+         *
          * @param datumKey data key
          * @param action   action for data
          */
         public void addTask(String datumKey, DataOperation action) {
-            
+            // key的构成:  com.alibaba.nacos.naming.domains.meta. + namespaceId + ## + serviceName
             if (services.containsKey(datumKey) && action == DataOperation.CHANGE) {
                 return;
             }
             if (action == DataOperation.CHANGE) {
                 services.put(datumKey, StringUtils.EMPTY);
             }
+            // 将一个新的通知任务（由 datumKey 和 action 组成的 Pair）添加到 tasks 队列中。
+            // Pair.with(datumKey, action) 是使用 org.javatuples.Pair 类创建一个包含两个元素的不可变对象。
+            // 这里 datumKey 是数据键，action 是操作类型（如 CHANGE 或 DELETE）。
+            // 这个 Pair 对象会被放入 tasks 队列中，以便后续处理。
             tasks.offer(Pair.with(datumKey, action));
         }
         
@@ -409,6 +425,7 @@ public class DistroConsistencyServiceImpl implements EphemeralConsistencyService
         
         private void handle(Pair<String, DataOperation> pair) {
             try {
+                // datumKey的构成:  com.alibaba.nacos.naming.domains.meta. + namespaceId + ## + serviceName
                 String datumKey = pair.getValue0();
                 DataOperation action = pair.getValue1();
                 

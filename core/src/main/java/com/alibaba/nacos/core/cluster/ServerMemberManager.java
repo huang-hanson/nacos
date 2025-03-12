@@ -109,6 +109,7 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
     
     /**
      * self member obj.
+     * 当前对象
      */
     private volatile Member self;
     
@@ -269,6 +270,8 @@ public class ServerMemberManager implements ApplicationListener<WebServerInitial
     
     /**
      * return this cluster all members without self.
+     *
+     * 将此集群返回所有成员，而不返回 self。
      *
      * @return {@link Collection} all member without self
      */

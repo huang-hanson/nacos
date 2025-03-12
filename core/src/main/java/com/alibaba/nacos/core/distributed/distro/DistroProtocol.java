@@ -103,20 +103,25 @@ public class DistroProtocol {
      * @param action    the action of data operation
      */
     public void sync(DistroKey distroKey, DataOperation action) {
+        // distroConfig.getSyncDelayMillis() 默认为1秒
         sync(distroKey, action, distroConfig.getSyncDelayMillis());
     }
     
     /**
      * Start to sync data to all remote server.
+     * 开始将数据同步到所有远程服务器。
      *
      * @param distroKey distro key of sync data
      * @param action    the action of data operation
      */
     public void sync(DistroKey distroKey, DataOperation action, long delay) {
+        // 遍历nacos集群中除自己以外的其他节点
         for (Member each : memberManager.allMembersWithoutSelf()) {
             DistroKey distroKeyWithTarget = new DistroKey(distroKey.getResourceKey(), distroKey.getResourceType(),
                     each.getAddress());
+            // 定义一个Distor的同步任务
             DistroDelayTask distroDelayTask = new DistroDelayTask(distroKeyWithTarget, action, delay);
+            // 交给线程池去执行
             distroTaskEngineHolder.getDelayTaskExecuteEngine().addTask(distroKeyWithTarget, distroDelayTask);
             if (Loggers.DISTRO.isDebugEnabled()) {
                 Loggers.DISTRO.debug("[DISTRO-SCHEDULE] {} to {}", distroKey, each.getAddress());

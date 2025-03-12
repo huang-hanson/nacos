@@ -135,10 +135,14 @@ public class NacosDelayTaskExecuteEngine extends AbstractNacosTaskExecuteEngine<
     
     /**
      * process tasks in execute engine.
+     * 执行引擎中的流程任务。
      */
     protected void processTasks() {
+        // 获取任务map中所有的key
         Collection<Object> keys = getAllTaskKeys();
+        //遍历key 并执行任务
         for (Object taskKey : keys) {
+            // 取一个任务便从map中移除一个任务
             AbstractDelayTask task = removeTask(taskKey);
             if (null == task) {
                 continue;
@@ -150,11 +154,13 @@ public class NacosDelayTaskExecuteEngine extends AbstractNacosTaskExecuteEngine<
             }
             try {
                 // ReAdd task if process failed
+                // 尝试执行同步任务，如果失败会重试
                 if (!processor.process(task)) {
                     retryFailedTask(taskKey, task);
                 }
             } catch (Throwable e) {
                 getEngineLog().error("Nacos task execute error : " + e.toString(), e);
+                // 如果失败会重试
                 retryFailedTask(taskKey, task);
             }
         }

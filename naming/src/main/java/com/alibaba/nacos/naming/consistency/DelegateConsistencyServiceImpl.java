@@ -64,6 +64,7 @@ public class DelegateConsistencyServiceImpl implements ConsistencyService {
     public void listen(String key, RecordListener listener) throws NacosException {
         
         // this special key is listened by both:
+        // 此特殊键由以下两个人侦听：
         if (KeyBuilder.SERVICE_META_KEY_PREFIX.equals(key)) {
             persistentConsistencyService.listen(key, listener);
             ephemeralConsistencyService.listen(key, listener);

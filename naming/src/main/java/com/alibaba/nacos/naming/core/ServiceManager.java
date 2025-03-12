@@ -450,6 +450,7 @@ public class ServiceManager implements RecordListener<Service> {
     }
     
     public void addOrReplaceService(Service service) throws NacosException {
+        // key:  com.alibaba.nacos.naming.domains.meta. + namespaceId + ## + serviceName
         consistencyService.put(KeyBuilder.buildServiceMetaKey(service.getNamespaceId(), service.getName()), service);
     }
     
@@ -912,9 +913,13 @@ public class ServiceManager implements RecordListener<Service> {
     }
     
     private void putServiceAndInit(Service service) throws NacosException {
+        // 1.把空的服务放入注册表
         putService(service);
+        // 2.从注册表中获取服务
         service = getService(service.getNamespaceId(), service.getName());
+        // 3.服务开启心跳检测
         service.init();
+        // 4.把服务加入监听列表
         consistencyService
                 .listen(KeyBuilder.buildInstanceListKey(service.getNamespaceId(), service.getName(), true), service);
         consistencyService

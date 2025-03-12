@@ -23,6 +23,7 @@ import com.alibaba.nacos.core.utils.Loggers;
 
 /**
  * Distro delay task execute engine.
+ * Distro delay 任务执行引擎。
  *
  * @author xiweng.yy
  */
