@@ -83,10 +83,11 @@ public class ClientBeatCheckTask implements Runnable {
             if (!getSwitchDomain().isHealthCheckEnabled()) {
                 return;
             }
-            
+            // 1.找到所有的零时实例
             List<Instance> instances = service.allIPs(true);
             
             // first set health status of instances:
+            // 2.遍历所有的临时实例，找到所有心跳超时的实例（当前时间-上一次心跳时间 > 超时时间 默认15s），健康状态置为false
             for (Instance instance : instances) {
                 if (System.currentTimeMillis() - instance.getLastBeat() > instance.getInstanceHeartBeatTimeOut()) {
                     if (!instance.isMarked()) {
@@ -97,7 +98,9 @@ public class ClientBeatCheckTask implements Runnable {
                                             instance.getIp(), instance.getPort(), instance.getClusterName(),
                                             service.getName(), UtilsAndCommons.LOCALHOST_SITE,
                                             instance.getInstanceHeartBeatTimeOut(), instance.getLastBeat());
+                            // 此时实例状态改变了，则发布serviceChange事件
                             getPushService().serviceChanged(service);
+                            // 发布实例心跳超时事件
                             ApplicationUtils.publishEvent(new InstanceHeartbeatTimeoutEvent(this, instance));
                         }
                     }
@@ -109,6 +112,7 @@ public class ClientBeatCheckTask implements Runnable {
             }
             
             // then remove obsolete instances:
+            // 3.遍历所有的临时实例，找到所有满足删除条件的的实例（当前时间-上一次心跳时间 > 删除条件时间 默认30s），在注册表中删除实例
             for (Instance instance : instances) {
                 
                 if (instance.isMarked()) {

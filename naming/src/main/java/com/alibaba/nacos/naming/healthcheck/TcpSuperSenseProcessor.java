@@ -101,12 +101,13 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
     
     @Override
     public void process(HealthCheckTask task) {
+        // 获取全部永久实例
         List<Instance> ips = task.getCluster().allIPs(false);
         
         if (CollectionUtils.isEmpty(ips)) {
             return;
         }
-        
+        // 遍历全部所有永久实例
         for (Instance ip : ips) {
             
             if (ip.isMarked()) {
@@ -124,7 +125,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
                         .reEvaluateCheckRT(task.getCheckRtNormalized() * 2, task, switchDomain.getTcpHealthParams());
                 continue;
             }
-            
+            // 将实例封装成beat并加入阻塞队列
             Beat beat = new Beat(ip, task);
             taskQueue.add(beat);
             MetricsMonitor.getTcpHealthCheckMonitor().incrementAndGet();
@@ -132,8 +133,10 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
     }
     
     private void processTask() throws Exception {
+        // 异步任务集合
         Collection<Callable<Void>> tasks = new LinkedList<>();
         do {
+            // 从队列中取beat  一定时间没取到就返回  250ms没取到就返回null
             Beat beat = taskQueue.poll(CONNECT_TIMEOUT_MS / 2, TimeUnit.MILLISECONDS);
             if (beat == null) {
                 return;
@@ -141,7 +144,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
             
             tasks.add(new TaskProcessor(beat));
         } while (taskQueue.size() > 0 && tasks.size() < NIO_THREAD_COUNT * 64);
-        
+        // 任务批量提交并获取返回值  保证任务都执行完成  执行TaskProcessor任务
         for (Future<?> f : GlobalExecutor.invokeAllTcpSuperSenseTask(tasks)) {
             f.get();
         }
@@ -151,6 +154,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
     public void run() {
         while (true) {
             try {
+                // 从队列中取出实例信息并尝试建立连接
                 processTask();
                 
                 int readyCount = selector.selectNow();
@@ -162,7 +166,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
                 while (iter.hasNext()) {
                     SelectionKey key = iter.next();
                     iter.remove();
-                    
+                    // 连接状态处理
                     GlobalExecutor.executeTcpSuperSense(new PostProcessor(key));
                 }
             } catch (Throwable e) {
@@ -186,6 +190,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
             try {
                 if (!beat.isHealthy()) {
                     //invalid beat means this server is no longer responsible for the current service
+                    // 实例已经是不健康状态了 就结束
                     key.cancel();
                     key.channel().close();
                     
@@ -196,6 +201,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
                 if (key.isValid() && key.isConnectable()) {
                     //connected
                     channel.finishConnect();
+                    // 连接成功 进入处理方法
                     beat.finishCheck(true, false, System.currentTimeMillis() - beat.getTask().getStartTime(),
                             "tcp:ok+");
                 }
@@ -269,7 +275,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
         
         public void finishCheck(boolean success, boolean now, long rt, String msg) {
             ip.setCheckRt(System.currentTimeMillis() - startTime);
-            
+            // 连接成功或者失败处理  里面都会发布服务变更事件
             if (success) {
                 healthCheckCommon.checkOK(ip, task, msg);
             } else {
@@ -331,17 +337,18 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
             if (key != null && key.isValid()) {
                 SocketChannel channel = (SocketChannel) key.channel();
                 Beat beat = (Beat) key.attachment();
-                
+                // 检测连接过，连接过就代表实例状态正常，直接返回
                 if (channel.isConnected()) {
                     return;
                 }
-                
+                // 到这里已经代表超过了延迟事件，关闭连接
                 try {
                     channel.finishConnect();
                 } catch (Exception ignore) {
                 }
                 
                 try {
+                    // 代表心跳检测超时了
                     beat.finishCheck(false, false, beat.getTask().getCheckRtNormalized() * 2, "tcp:timeout");
                     key.cancel();
                     key.channel().close();
@@ -370,6 +377,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
             
             SocketChannel channel = null;
             try {
+                // 获取实例Ip
                 Instance instance = beat.getIp();
                 
                 BeatKey beatKey = keyMap.get(beat.toString());
@@ -382,7 +390,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
                     beatKey.key.cancel();
                     beatKey.key.channel().close();
                 }
-                
+                // 开启socket连接
                 channel = SocketChannel.open();
                 channel.configureBlocking(false);
                 // only by setting this can we make the socket close event asynchronous
@@ -400,7 +408,7 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
                 keyMap.put(beat.toString(), new BeatKey(key));
                 
                 beat.setStartTime(System.currentTimeMillis());
-                
+                // 延迟队列  开启超时检测
                 GlobalExecutor
                         .scheduleTcpSuperSenseTask(new TimeOutTask(key), CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             } catch (Exception e) {

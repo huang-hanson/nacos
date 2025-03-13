@@ -44,6 +44,7 @@ public class DistroMapper extends MemberChangeListener {
     
     /**
      * List of service nodes, you must ensure that the order of healthyList is the same for all nodes.
+     * List 中，您必须确保所有节点的 healthyList 顺序相同。
      */
     private volatile List<String> healthyList = new ArrayList<>();
     
@@ -76,6 +77,7 @@ public class DistroMapper extends MemberChangeListener {
     
     /**
      * Judge whether current server is responsible for input service.
+     * 判断当前服务器是否负责输入服务。
      *
      * @param serviceName service name
      * @return true if input service is response, otherwise false

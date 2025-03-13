@@ -79,6 +79,7 @@ public class HealthCheckTask implements Runnable {
         try {
             if (distroMapper.responsible(cluster.getService().getName()) && switchDomain
                     .isHealthCheckEnabled(cluster.getService().getName())) {
+                //具体检测方法
                 healthCheckProcessor.process(this);
                 if (Loggers.EVT_LOG.isDebugEnabled()) {
                     Loggers.EVT_LOG
@@ -91,6 +92,7 @@ public class HealthCheckTask implements Runnable {
                             cluster.getName(), e);
         } finally {
             if (!cancelled) {
+                // 继续延迟执行
                 HealthCheckReactor.scheduleCheck(this);
                 
                 // worst == 0 means never checked

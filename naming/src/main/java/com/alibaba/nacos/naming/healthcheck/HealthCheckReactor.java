@@ -36,6 +36,7 @@ public class HealthCheckReactor {
     
     /**
      * Schedule health check task.
+     * 调度健康检测任务
      *
      * @param task health check task
      * @return scheduled future

@@ -61,7 +61,7 @@ import java.util.zip.GZIPOutputStream;
 @Component
 @SuppressWarnings("PMD.ThreadPoolCreationRule")
 public class PushService implements ApplicationContextAware, ApplicationListener<ServiceChangeEvent> {
-    
+    // PushService类实现ApplicationListener接口，监听ServiceChangeEvent（服务变更事件)
     @Autowired
     private SwitchDomain switchDomain;
     
@@ -115,7 +115,10 @@ public class PushService implements ApplicationContextAware, ApplicationListener
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         this.applicationContext = applicationContext;
     }
-    
+
+    /**
+     * 服务变更事件
+     */
     @Override
     public void onApplicationEvent(ServiceChangeEvent event) {
         Service service = event.getService();
@@ -367,11 +370,15 @@ public class PushService implements ApplicationContextAware, ApplicationListener
     
     /**
      * Service changed.
+     * 事件触发则是PushService.serviceChanged方法，
+     * 这个方法之前我们就见过，在服务注册里面，心跳里面也有，
+     * 服务变更就会调用这个方法，触发事件让服务端主动推送服务变更信息
      *
      * @param service service
      */
     public void serviceChanged(Service service) {
         // merge some change events to reduce the push frequency:
+        // 合并一些 change 事件以降低推送频率：
         if (futureMap
                 .containsKey(UtilsAndCommons.assembleFullServiceName(service.getNamespaceId(), service.getName()))) {
             return;
@@ -382,6 +389,7 @@ public class PushService implements ApplicationContextAware, ApplicationListener
     
     /**
      * Judge whether this agent is supported to push.
+     * 判断是否支持该 agent 推送。
      *
      * @param agent agent information
      * @return true if agent can be pushed, otherwise false

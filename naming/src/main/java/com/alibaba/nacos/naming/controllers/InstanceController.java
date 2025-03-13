@@ -384,7 +384,7 @@ public class InstanceController {
     @GetMapping("/list")
     @Secured(parser = NamingResourceParser.class, action = ActionTypes.READ)
     public ObjectNode list(HttpServletRequest request) throws Exception {
-        
+        // 获取相关参数并校验
         String namespaceId = WebUtils.optional(request, CommonParams.NAMESPACE_ID, Constants.DEFAULT_NAMESPACE_ID);
         String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
         NamingUtils.checkServiceNameFormat(serviceName);
@@ -392,6 +392,7 @@ public class InstanceController {
         String agent = WebUtils.getUserAgent(request);
         String clusters = WebUtils.optional(request, "clusters", StringUtils.EMPTY);
         String clientIP = WebUtils.optional(request, "clientIP", StringUtils.EMPTY);
+        // 获取客户端 UDP端口
         int udpPort = Integer.parseInt(WebUtils.optional(request, "udpPort", "0"));
         String env = WebUtils.optional(request, "env", StringUtils.EMPTY);
         boolean isCheck = Boolean.parseBoolean(WebUtils.optional(request, "isCheck", "false"));
@@ -401,7 +402,7 @@ public class InstanceController {
         String tenant = WebUtils.optional(request, "tid", StringUtils.EMPTY);
         
         boolean healthyOnly = Boolean.parseBoolean(WebUtils.optional(request, "healthyOnly", "false"));
-        
+        // 获取服务列表
         return doSrvIpxt(namespaceId, serviceName, agent, clusters, clientIP, udpPort, env, isCheck, app, tenant,
                 healthyOnly);
     }
@@ -494,6 +495,7 @@ public class InstanceController {
         String serviceName = WebUtils.required(request, CommonParams.SERVICE_NAME);
         NamingUtils.checkServiceNameFormat(serviceName);
         Loggers.SRV_LOG.debug("[CLIENT-BEAT] full arguments: beat: {}, serviceName: {}", clientBeat, serviceName);
+        // 从注册表中获取实例
         Instance instance = serviceManager.getInstance(namespaceId, serviceName, clusterName, ip, port);
         
         if (instance == null) {
@@ -514,7 +516,7 @@ public class InstanceController {
             instance.setServiceName(serviceName);
             instance.setInstanceId(instance.getInstanceId());
             instance.setEphemeral(clientBeat.isEphemeral());
-            
+            // 如果是里还未注册，则重新注册
             serviceManager.registerInstance(namespaceId, serviceName, instance);
         }
         
@@ -530,6 +532,7 @@ public class InstanceController {
             clientBeat.setPort(port);
             clientBeat.setCluster(clusterName);
         }
+        // 开启一个异步任务将实例状态 置为健康状态
         service.processClientBeat(clientBeat);
         
         result.put(CommonParams.CODE, NamingResponseCode.OK);
@@ -652,6 +655,7 @@ public class InstanceController {
     
     /**
      * Get service full information with instances.
+     * 使用实例获取服务完整信息。
      *
      * @param namespaceId namespace id
      * @param serviceName service name
@@ -678,7 +682,7 @@ public class InstanceController {
         // now try to enable the push
         try {
             if (udpPort > 0 && pushService.canEnablePush(agent)) {
-                
+                // 添加当前客户端IP、UDP端口到 PushService 中
                 pushService
                         .addClient(namespaceId, serviceName, clusters, agent, new InetSocketAddress(clientIP, udpPort),
                                 pushDataSource, tid, app);
@@ -689,7 +693,7 @@ public class InstanceController {
                     .error("[NACOS-API] failed to added push client {}, {}:{}", clientInfo, clientIP, udpPort, e);
             cacheMillis = switchDomain.getDefaultCacheMillis();
         }
-        
+        // 没找到就返回空
         if (service == null) {
             if (Loggers.SRV_LOG.isDebugEnabled()) {
                 Loggers.SRV_LOG.debug("no instance to serve for service: {}", serviceName);
@@ -700,31 +704,25 @@ public class InstanceController {
             result.replace("hosts", JacksonUtils.createEmptyArrayNode());
             return result;
         }
-        
         checkIfDisabled(service);
-        
         List<Instance> srvedIPs;
-        
         srvedIPs = service.srvIPs(Arrays.asList(StringUtils.split(clusters, ",")));
-        
         // filter ips using selector:
+        // 使用选择器过滤 IP：
         if (service.getSelector() != null && StringUtils.isNotBlank(clientIP)) {
             srvedIPs = service.getSelector().select(clientIP, srvedIPs);
         }
         
         if (CollectionUtils.isEmpty(srvedIPs)) {
-            
             if (Loggers.SRV_LOG.isDebugEnabled()) {
                 Loggers.SRV_LOG.debug("no instance to serve for service: {}", serviceName);
             }
-            
             if (clientInfo.type == ClientInfo.ClientType.JAVA
                     && clientInfo.version.compareTo(VersionUtil.parseVersion("1.0.0")) >= 0) {
                 result.put("dom", serviceName);
             } else {
                 result.put("dom", NamingUtils.getServiceName(serviceName));
             }
-            
             result.put("name", serviceName);
             result.put("cacheMillis", cacheMillis);
             result.put("lastRefTime", System.currentTimeMillis());

@@ -298,6 +298,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
      * Init service.
      */
     public void init() {
+        // 1.对临时实例开启  心跳超时检测
         HealthCheckReactor.scheduleCheck(clientBeatCheckTask);
         for (Map.Entry<String, Cluster> entry : clusterMap.entrySet()) {
             entry.getValue().setService(this);
@@ -348,6 +349,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
     
     /**
      * Get all instance of ephemeral or consistency.
+     * 获取 ephemeral 或 consistency 的所有实例。
      *
      * @param ephemeral whether ephemeral instance
      * @return all instance of ephemeral if @param ephemeral = true, otherwise all instance of consistency
@@ -382,6 +384,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
     
     /**
      * Get all instance from input clusters.
+     * 从输入集群获取所有实例。
      *
      * @param clusters cluster names
      * @return all instance from input clusters, if clusters is empty, return all cluster

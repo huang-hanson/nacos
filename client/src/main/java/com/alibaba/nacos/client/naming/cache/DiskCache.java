@@ -37,6 +37,7 @@ import static com.alibaba.nacos.client.utils.LogUtils.NAMING_LOGGER;
 
 /**
  * Disk cache.
+ * 磁盘缓存。
  *
  * @author xuanyin
  */

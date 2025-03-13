@@ -22,6 +22,7 @@ import java.util.Map;
 
 /**
  * Metrics info of server.
+ * 服务器的 metrics 信息。
  *
  * @author nacos
  */

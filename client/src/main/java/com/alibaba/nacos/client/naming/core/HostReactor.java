@@ -112,6 +112,7 @@ public class HostReactor implements Closeable {
         this.pushEmptyProtection = pushEmptyProtection;
         this.updatingMap = new ConcurrentHashMap<String, Object>();
         this.failoverReactor = new FailoverReactor(this, cacheDir);
+        // 服务端推送变更接收器
         this.pushReceiver = new PushReceiver(this);
         this.notifier = new InstancesChangeNotifier();
         
@@ -156,6 +157,10 @@ public class HostReactor implements Closeable {
     
     /**
      * Process service json.
+     *
+     * 更新本地缓存
+     * 发布实例变更事件
+     * 写入磁盘（故障转移机制）
      *
      * @param json service json
      * @return service info
@@ -304,26 +309,32 @@ public class HostReactor implements Closeable {
     public ServiceInfo getServiceInfo(final String serviceName, final String clusters) {
         
         NAMING_LOGGER.debug("failover-mode: " + failoverReactor.isFailoverSwitch());
+        // 由  服务名@@集群名称拼接  key
         String key = ServiceInfo.getKey(serviceName, clusters);
+        // 这里是故障转移机制，该机制会在本地生成服务信息的文件  这里就是判断是否去从文件中读取服务信息
         if (failoverReactor.isFailoverSwitch()) {
             return failoverReactor.getService(key);
         }
-        
+        // 读取本地服务列表的缓存，缓存是一个Map，格式：Map<String, ServiceInfo>
         ServiceInfo serviceObj = getServiceInfo0(serviceName, clusters);
-        
+        // 判断缓存是否存在
         if (null == serviceObj) {
+            // 不存在则创建一个ServiceInfo
             serviceObj = new ServiceInfo(serviceName, clusters);
-            
+            // 空ServiceInfo  放入缓存
             serviceInfoMap.put(serviceObj.getKey(), serviceObj);
-            
+            // 放入待更新的服务列表（updatingMap）中
             updatingMap.put(serviceName, new Object());
+            // 立即更新服务列表
             updateServiceNow(serviceName, clusters);
+            // 从待更新的列表中移除
             updatingMap.remove(serviceName);
             
         } else if (updatingMap.containsKey(serviceName)) {
-            
+            // 缓存中有但是需要更新
             if (UPDATE_HOLD_INTERVAL > 0) {
                 // hold a moment waiting for update finish
+                // 等待更新完成
                 synchronized (serviceObj) {
                     try {
                         serviceObj.wait(UPDATE_HOLD_INTERVAL);
@@ -334,9 +345,9 @@ public class HostReactor implements Closeable {
                 }
             }
         }
-        
+        // 开启定时更新服务列表的功能
         scheduleUpdateIfAbsent(serviceName, clusters);
-        
+        // 返回缓存中的服务信息
         return serviceInfoMap.get(serviceObj.getKey());
     }
     
@@ -350,20 +361,23 @@ public class HostReactor implements Closeable {
     
     /**
      * Schedule update if absent.
+     * 如果不存在，则更新计划。
      *
      * @param serviceName service name
      * @param clusters    clusters
      */
     public void scheduleUpdateIfAbsent(String serviceName, String clusters) {
+        // 服务已经存在列表中就不再添加
         if (futureMap.get(ServiceInfo.getKey(serviceName, clusters)) != null) {
             return;
         }
         
         synchronized (futureMap) {
+            // 加锁双重校验
             if (futureMap.get(ServiceInfo.getKey(serviceName, clusters)) != null) {
                 return;
             }
-            
+            // 加入UpdateTask任务，延迟执行
             ScheduledFuture<?> future = addTask(new UpdateTask(serviceName, clusters));
             futureMap.put(ServiceInfo.getKey(serviceName, clusters), future);
         }
@@ -417,9 +431,13 @@ public class HostReactor implements Closeable {
         NotifyCenter.deregisterSubscriber(notifier);
         NAMING_LOGGER.info("{} do shutdown stop", className);
     }
-    
+
+    /**
+     * UpdateTask类就是一个异步执行类，里面会调用updateService方法更新服务信息,同时结束又会开启延迟，延迟的时间跟请求失败的次数有关，最多60s，正常是1s一次
+     */
     public class UpdateTask implements Runnable {
-        
+
+        // 上次引用的时间
         long lastRefTime = Long.MAX_VALUE;
         
         private final String clusters;
@@ -428,6 +446,7 @@ public class HostReactor implements Closeable {
         
         /**
          * the fail situation. 1:can't connect to server 2:serviceInfo's hosts is empty
+         * 失败的情况。1：无法连接服务器 2：serviceInfo 的 hosts 为空
          */
         private int failCount = 0;
         
@@ -450,17 +469,20 @@ public class HostReactor implements Closeable {
         
         @Override
         public void run() {
+            // 延迟时间，默认1s
             long delayTime = DEFAULT_DELAY;
             
             try {
                 ServiceInfo serviceObj = serviceInfoMap.get(ServiceInfo.getKey(serviceName, clusters));
                 
                 if (serviceObj == null) {
+                    // 请求更新
                     updateService(serviceName, clusters);
                     return;
                 }
                 
                 if (serviceObj.getLastRefTime() <= lastRefTime) {
+                    // 请求更新
                     updateService(serviceName, clusters);
                     serviceObj = serviceInfoMap.get(ServiceInfo.getKey(serviceName, clusters));
                 } else {
@@ -482,11 +504,13 @@ public class HostReactor implements Closeable {
                     return;
                 }
                 delayTime = serviceObj.getCacheMillis();
+                // 重置失败次数 为0
                 resetFailCount();
             } catch (Throwable e) {
                 incFailCount();
                 NAMING_LOGGER.warn("[NA] failed to update serviceName: " + serviceName, e);
             } finally {
+                // 重置延迟执行，延迟时间根据失败次数增加
                 executor.schedule(this, Math.min(delayTime << failCount, DEFAULT_DELAY * 60), TimeUnit.MILLISECONDS);
             }
         }
